@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "name": "Сеть с нуля — интерактивный учебник",
+  "short_name": "Сеть с нуля",
+  "lang": "ru",
+  "description": "Сети, подсети и практика Windows простыми словами.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fffaf0",
+  "theme_color": "#20365b",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
