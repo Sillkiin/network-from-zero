@@ -66,6 +66,28 @@ h1{letter-spacing:-1.8px;font-weight:780}.hero h1 em{color:#345bdb;position:rela
 @media(max-width:350px){.phone-header #phone-menu-open{padding:8px}.phone-header #phone-menu-open .phone-menu-label{display:none}.phone-current-name{font-size:12px}.address-loose-cards{gap:9px}.address-loose-cards button{width:42px;height:57px}.address-small-ranges .address-range-bounds{font-size:20px}.address-range-group{padding:11px 8px}.address-practice-options{grid-template-columns:1fr}.address-targets .option{font-size:12px}.phone-bottom small{display:none}}
 @media(max-width:850px),(pointer:coarse) and (max-width:1100px){.service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-card{min-width:0;overflow-wrap:anywhere}.layer-layout,.lab-grid{grid-template-columns:minmax(0,1fr)}.layer-stack{position:static;display:grid;grid-template-columns:1fr 1fr}.three-grid,.two-grid,.glossary-grid{grid-template-columns:minmax(0,1fr)}.layer-detail{min-width:0}.scene-player{min-width:0}.terminal{min-width:0}.terminal input{min-width:0}.phone-install-steps{font-size:16px}}
 @media(max-width:350px){.service-grid{grid-template-columns:minmax(0,1fr)}.service-card{min-height:0}}
+/* Схемы перестраиваются по ширине, прокручиваемых полотен на телефоне нет. */
+#packet-group{pointer-events:none}
+#phone-ui{display:contents}
+@media(max-width:850px),(pointer:coarse) and (max-width:1100px){
+ .scene-stage,.network-viewport{overflow:visible;overscroll-behavior-x:auto}
+ .scene-stage svg,.term-dialog .scene-stage svg,.layer-detail .scene-stage svg{display:block;width:100%;min-width:0;max-width:100%;height:auto;min-height:0;max-height:none;padding:14px 4px 5px}
+ .scene-stage:after,.network-viewport:after{display:none;content:none}
+ .network-viewport .network-svg{display:block;width:100%;min-width:0;max-width:100%;height:auto;min-height:0;max-height:none}
+ .network-compact .network-zone{font-size:11px;letter-spacing:.6px}
+ .network-compact .phone-node-name{font-size:16px;font-weight:650}
+ .network-compact .node .node-sub{font-size:12px}
+ .network-compact .node .live-node-state{font-size:10px;letter-spacing:0}
+ .network-compact .packet-label{font-size:11px}
+ .scene-compact .actor-name{font-size:16px}.scene-compact .actor-sub{font-size:12px}.scene-compact .actor-state{font-size:11px;letter-spacing:0}
+ .scene-board,.terminal-output{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+ .scene-board>div{min-width:0;white-space:normal}
+ .terminal form{flex-wrap:wrap;gap:6px}.terminal form>span{overflow-wrap:anywhere;max-width:100%}.terminal form input{flex:1 1 120px}.terminal form button{flex-shrink:0}
+ .envelope,.payload,.definition-line,.address-list dd,.stat strong,.phone-dialog{overflow-wrap:anywhere}
+ .dhcp-lane{flex-direction:column;align-items:stretch}.dhcp-end{width:100%}.dhcp-message{width:100%;min-width:0}.dhcp-arrow{transform:rotate(90deg);align-self:center}
+ .mission-tabs,.command-buttons,.match-options,.micro-shortcuts{flex-wrap:wrap}.mission-tabs button,.command-buttons button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+ .scene-talk,.scene-explanation,.scene-micro,.layer-detail,.service-detail,.address-advanced .two-grid>*{min-width:0}
+}
 @media print{.phone-header,.phone-bottom,.phone-dialog{display:none!important}}
 
 </style>
@@ -127,6 +149,40 @@ function deviceGraphic(type) {
 
 function deviceThumb(type) {
   return `<svg class="device-thumb" viewBox="-76 -82 152 150" aria-hidden="true">${DEVICE_DEFS}${deviceGraphic(type)}</svg>`;
+}
+
+// Общие приёмы для узких схем: подписи в несколько строк и обход подписей линией.
+const compactDiagramMedia=matchMedia('(max-width:620px)');
+function diagramLabel(text,limit=18,lineHeight=18){
+  const lines=[];let line='';
+  for(const word of String(text).split(/\s+/)){
+    if(line&&line.length+word.length+1>limit){lines.push(line);line='';}
+    line+=(line?' ':'')+word;
+  }
+  if(line)lines.push(line);
+  return lines.map((value,i)=>`<tspan x="0" dy="${i?lineHeight:0}">${esc(value)}</tspan>`).join('');
+}
+function diagramHop(from,to,inset=0,compact=false){
+  const dx=to[0]-from[0],dy=to[1]-from[1],length=Math.hypot(dx,dy);
+  if(!length)return [from,to];
+  if(compact&&Math.abs(dy)>120){
+    if(Math.abs(dx)<1||from[0]===180||to[0]===180){
+      const anchor=from[0]===180?to[0]:from[0],side=anchor<180?15:345;
+      return [[from[0]+Math.sign(side-from[0])*inset,from[1]],[side,from[1]],[side,to[1]],[to[0]+Math.sign(side-to[0])*inset,to[1]]];
+    }
+    return [[from[0]+Math.sign(180-from[0])*inset,from[1]],[180,from[1]],[180,to[1]],[to[0]+Math.sign(180-to[0])*inset,to[1]]];
+  }
+  const gap=Math.min(inset,length/3);
+  return [[from[0]+dx/length*gap,from[1]+dy/length*gap],[to[0]-dx/length*gap,to[1]-dy/length*gap]];
+}
+function diagramTravel(points,fraction){
+  const distances=points.slice(1).map((p,i)=>Math.hypot(p[0]-points[i][0],p[1]-points[i][1]));
+  let distance=distances.reduce((sum,n)=>sum+n,0)*Math.max(0,Math.min(1,fraction));
+  for(let i=0;i<distances.length;i++){
+    if(distance<=distances[i]||i===distances.length-1){const t=distances[i]?distance/distances[i]:0;return {x:points[i][0]+(points[i+1][0]-points[i][0])*t,y:points[i][1]+(points[i+1][1]-points[i][1])*t,segment:i};}
+    distance-=distances[i];
+  }
+  return {x:points[0][0],y:points[0][1],segment:0};
 }
 
 /* Учебные данные. Адреса TEST-NET и example.test вымышлены. */
@@ -553,7 +609,12 @@ document.addEventListener('click',e=>{
 document.addEventListener('visibilitychange',()=>{if(document.hidden)scenePlayers.forEach(p=>p.pause());});
 
 function sceneArt(type){return deviceGraphic(type);}
-function sceneLayout(scene){
+function sceneLayout(scene,compact=compactDiagramMedia.matches){
+  if(compact){
+    if(scene.actors.length===4)return {a:[90,105],d:[90,345],b:[270,105],c:[270,345]};
+    const positions=scene.actors.length===2?[[90,105],[270,105]]:[[90,105],[270,105],[180,345]];
+    return Object.fromEntries(scene.actors.map((actor,i)=>[actor.id,positions[i]]));
+  }
   if(scene.actors.length===4)return {a:[85,106],d:[85,266],b:[305,180],c:[525,180]};
   const positions=scene.actors.length===2?[[105,135],[495,135]]:[[80,135],[300,135],[520,135]];
   return Object.fromEntries(scene.actors.map((a,i)=>[a.id,positions[i]]));
@@ -581,18 +642,23 @@ function sceneHTML(id,serial) {
 function mountScene(host,id) {
   if(!host||!SCENES[id])return;
   learningCleanup(host);host.innerHTML=sceneHTML(id,++sceneSerial);
-  const root=host.firstElementChild,scene=SCENES[id],positions=sceneLayout(scene),find=q=>root.querySelector(q);
+  const root=host.firstElementChild,scene=SCENES[id],find=q=>root.querySelector(q);
+  let compact=compactDiagramMedia.matches,positions=sceneLayout(scene,compact);
   let index=0,request=0,auto=false,t=0,last=0,moving=false,cable=true,destroyed=false;
   const player={root,pause,destroy};scenePlayers.add(player);
   function pause(){auto=false;moving=false;cancelAnimationFrame(request);last=0;find('[data-scene-play]').textContent='▶ Весь обмен';}
-  function destroy(){pause();destroyed=true;scenePlayers.delete(player);}
+  function destroy(){pause();destroyed=true;compactDiagramMedia.removeEventListener('change',relayout);scenePlayers.delete(player);}
+  function geometry(){
+    const height=compact?(scene.actors.length===2?270:500):(scene.actors.length===4?380:270);
+    root.classList.toggle('scene-compact',compact);
+    find('.scene-stage svg').setAttribute('viewBox',`0 0 ${compact?360:600} ${height}`);
+    scene.actors.forEach(actor=>{const el=find(`[data-actor="${actor.id}"]`);el.setAttribute('transform',`translate(${positions[actor.id].join(',')})`);el.querySelector('g').setAttribute('transform',`scale(${compact?.68:.82})`);el.querySelector('.actor-name').innerHTML=compact?diagramLabel(actor.name):esc(actor.name);el.querySelector('.actor-sub').setAttribute('y',compact?'124':'101');el.querySelector('.actor-sub').innerHTML=compact?diagramLabel(actor.sub,21,16):esc(actor.sub);});
+  }
+  function relayout(){if(destroyed)return;pause();compact=compactDiagramMedia.matches;positions=sceneLayout(scene,compact);geometry();update();start();}
   function draw(progress){
     const frame=scene.frames[index],from=positions[frame.from],to=positions[frame.to];
     const p=(!cable&&scene.interactive==='cable')?Math.min(progress,.28):frame.blocked?Math.min(progress,.68):progress;
-    const length=Math.hypot(to[0]-from[0],to[1]-from[1]),inset=length?Math.min(80,length/3):0;
-    const ux=length?(to[0]-from[0])/length:0,uy=length?(to[1]-from[1])/length:0;
-    const start=[from[0]+ux*inset,from[1]+uy*inset],end=[to[0]-ux*inset,to[1]-uy*inset];
-    const x=start[0]+(end[0]-start[0])*p,y=start[1]+(end[1]-start[1])*p;
+    const {x,y}=diagramTravel(diagramHop(from,to,compact?60:80,compact),p);
     find('.scene-letter').setAttribute('transform',`translate(${x},${y})`);
     find('.scene-letter').style.opacity=frame.from===frame.to?'0':'1';
     const blocked=frame.blocked||!cable;
@@ -609,8 +675,7 @@ function mountScene(host,id) {
     find('.scene-board').innerHTML=(frame.board||[]).map(row=>`<div>${esc(row)}</div>`).join('');
     root.classList.toggle('is-disconnected',disconnected);
     root.querySelectorAll('[data-actor]').forEach(el=>{const key=el.dataset.actor;el.classList.toggle('is-speaking',key===frame.from);el.classList.toggle('is-listening',key!==frame.from&&key===frame.to);el.classList.toggle('is-idle',key!==frame.from&&key!==frame.to);el.querySelector('.actor-state').textContent=key===frame.from?(frame.from===frame.to?'ОБРАБАТЫВАЕТ':'ОТПРАВЛЯЕТ'):key===frame.to?'ПОЛУЧАЕТ':'';});
-    const length=Math.hypot(to[0]-from[0],to[1]-from[1]),ux=length?(to[0]-from[0])/length:0,uy=length?(to[1]-from[1])/length:0;
-    const d=frame.from===frame.to?'':`M${from[0]+ux*80} ${from[1]+uy*80} L${to[0]-ux*80} ${to[1]-uy*80}`;
+    const d=frame.from===frame.to?'':'M'+diagramHop(from,to,compact?60:80,compact).map(p=>p.join(' ')).join(' L');
     find('.scene-wire').setAttribute('d',d);find('.scene-active-path').setAttribute('d',d);
     find('[data-scene-prev]').disabled=index===0;find('[data-scene-next]').disabled=index===scene.frames.length-1;
     find('.scene-dots').innerHTML=scene.frames.map((_,i)=>`<button data-scene-index="${i}" class="${i===index?'current':''}" aria-label="Реплика ${i+1}" ${i===index?'aria-current="step"':''}>${i+1}</button>`).join('');
@@ -641,7 +706,7 @@ function mountScene(host,id) {
     }
     if(e.target.closest('[data-cable]')){cable=!cable;pause();find('[data-cable]').textContent=cable?'Выдернуть кабель':'Подключить кабель';find('.cable-status').textContent=cable?'Кабель подключён':'Нет физической линии';update();start();}
   });
-  update();
+  geometry();compactDiagramMedia.addEventListener('change',relayout);update();
   // Первый показ — одна реплика без автоматического перехода. Дальше темп выбирает читатель.
   start();return player;
 }
@@ -852,9 +917,29 @@ function bindCommon() {
 }
 
 // Путешествие: линии и пакеты живут в координатах SVG и масштабируются вместе.
-const nodes = {pc:[84,150],sw:[254,150],router:[430,150],net:[618,150],server:[802,150],dns:[536,35],printer:[254,318]};
-function routePoints(route) { return route.map(id => nodes[id]); }
+const desktopNodes={pc:[84,150],sw:[254,150],router:[430,150],net:[618,150],server:[802,150],dns:[536,35],printer:[254,318]};
+const phoneNodes={pc:[90,100],sw:[270,100],router:[270,245],net:[270,410],server:[270,555],dns:[90,410],printer:[90,245]};
+const nodes={...desktopNodes};
+function journeyRoute(route){
+  if(route.length===1)return {points:[nodes[route[0]]],edges:[]};
+  const points=[],edges=[];
+  for(let i=0;i<route.length-1;i++){
+    const hop=diagramHop(nodes[route[i]],nodes[route[i+1]],0,compactDiagramMedia.matches);
+    if(!points.length)points.push(hop[0]);
+    for(const point of hop.slice(1)){points.push(point);edges.push(i);}
+  }
+  return {points,edges};
+}
+function routePoints(route) {return journeyRoute(route).points;}
+function phoneNetworkSVG(){
+  const labels={pc:['Компьютер','192.168.1.10'],sw:['Коммутатор','Соединяет соседей'],router:['Роутер','Выход в другие сети'],net:['Провайдер','Связывает сети'],server:['Сайт','203.0.113.80'],dns:['DNS-помощник','Находит адрес сайта'],printer:['Принтер','192.168.1.50']};
+  const node=id=>{const [x,y]=nodes[id],[title,sub]=labels[id];return `<g class="node ${state.selectedNode===id?'selected':''}" data-node="${id}" role="button" tabindex="0" aria-label="${esc(COURSE.nodes[id][1])}" transform="translate(${x},${y})"><rect class="selection-halo" x="-67" y="-53" width="134" height="108" rx="20"/><g class="device-art"><g transform="scale(.55)">${deviceGraphic(id==='dns'?'server':id)}</g></g><text class="live-node-state" x="0" y="-59"></text><text class="phone-node-name" x="0" y="70">${diagramLabel(title,19,16)}</text><text class="node-sub" x="0" y="88">${diagramLabel(sub,22,15)}</text></g>`;};
+  const wire=(a,b)=>'M'+diagramHop(nodes[a],nodes[b],0,true).map(p=>p.join(' ')).join(' L');
+  return `<svg class="network-svg network-compact" viewBox="0 0 360 665" role="group" aria-label="Учебная сеть целиком: компьютер, коммутатор, принтер и роутер дома; DNS, провайдер и сайт в других сетях.">${DEVICE_DEFS}<rect x="5" y="28" width="350" height="310" rx="20" fill="#fff3cf" stroke="#ecd69d" stroke-dasharray="5 7"/><rect x="5" y="370" width="350" height="290" rx="20" fill="#edf4ff" stroke="#c8daf5" stroke-dasharray="5 7"/><text x="15" y="19" class="network-zone">ДОМА · УСТРОЙСТВА РЯДОМ</text><text x="15" y="360" class="network-zone">ДРУГИЕ СЕТИ · ИНТЕРНЕТ</text>${[['pc','sw'],['sw','router'],['sw','printer'],['router','net'],['net','server'],['router','dns']].map(([a,b])=>`<path class="network-line" d="${wire(a,b)}"/>`).join('')}<path id="route-trace" class="route-trace" d=""/>${Object.keys(labels).map(node).join('')}<g aria-hidden="true" id="packet-group"><circle id="packet" class="packet" cx="90" cy="100" r="10"/><g id="packet-envelope" transform="translate(90,100)"><rect x="-7" y="-5" width="14" height="10" rx="1.5" fill="none" stroke="white" stroke-width="1.4"/><path d="M-7-4L0 1L7-4" fill="none" stroke="white" stroke-width="1.3"/></g><text id="packet-label" class="packet-label" x="90" y="78"></text></g></svg>`;
+}
 function networkSVG() {
+  Object.assign(nodes,compactDiagramMedia.matches?phoneNodes:desktopNodes);
+  if(compactDiagramMedia.matches)return phoneNetworkSVG();
   const node = (id, title, sub) => {
     const [x,y]=nodes[id];
     return `<g class="node ${state.selectedNode===id?'selected':''}" data-node="${id}" role="button" tabindex="0" aria-label="${esc(COURSE.nodes[id][1])}" transform="translate(${x},${y})"><rect class="selection-halo" x="-71" y="-79" width="142" height="146" rx="24"/><g class="device-art">${deviceGraphic(id)}</g><text class="live-node-state" x="0" y="-88"></text><text x="0" y="84">${title}</text><text class="node-sub" x="0" y="100">${sub}</text></g>`;
@@ -906,19 +991,10 @@ function updateJourney() {
   journeyLearning();
 }
 function updatePacket(fraction) {
-  const points=routePoints(journeySteps()[state.step].route);
-  let x=points[0][0],y=points[0][1];
-  let edge=0;
-  if(points.length>1){
-    const distances=points.slice(1).map((p,i)=>Math.hypot(p[0]-points[i][0],p[1]-points[i][1]));
-    let distance=distances.reduce((a,b)=>a+b,0)*Math.max(0,Math.min(1,fraction));
-    for(let i=0;i<distances.length;i++){
-      if(distance<=distances[i]||i===distances.length-1){edge=i;const f=distances[i]?distance/distances[i]:0;x=points[i][0]+(points[i+1][0]-points[i][0])*f;y=points[i][1]+(points[i+1][1]-points[i][1])*f;break;}distance-=distances[i];
-    }
-  }
+  const {points,edges}=journeyRoute(journeySteps()[state.step].route),{x,y,segment}=diagramTravel(points,fraction),edge=edges[segment]||0;
   $('#packet').setAttribute('cx',x);$('#packet').setAttribute('cy',y);
   $('#packet-envelope').setAttribute('transform',`translate(${x},${y})`);
-  $('#packet-label').setAttribute('x',x);$('#packet-label').setAttribute('y',y-22);
+  $('#packet-label').setAttribute('x',compactDiagramMedia.matches?Math.max(70,Math.min(290,x)):x);$('#packet-label').setAttribute('y',y-22);
   const route=journeySteps()[state.step].route,from=route[edge],to=route[edge+1]||from;
   $$('[data-node]').forEach(n=>{const key=n.dataset.node;n.classList.toggle('is-sending',key===from);n.classList.toggle('is-receiving',key!==from&&key===to);const label=n.querySelector('.live-node-state');if(label)label.textContent=key===from?'ОТПРАВЛЯЕТ':key===to?'ПОЛУЧАЕТ':'';});
   const direction=route.length>1?`${COURSE.nodes[from][1]} → ${COURSE.nodes[to][1]}`:'Компьютер готовит запрос';
@@ -945,6 +1021,9 @@ function bindJourney() {
   $('#prev-step').addEventListener('click',()=>changeStep(state.step-1));
   $('#next-step').addEventListener('click',()=>changeStep(state.step+1));
   $('#speed').addEventListener('change',e=>{playbackSpeed=Number(e.target.value);});
+  bindJourneyNodes();
+}
+function bindJourneyNodes(){
   $$('[data-node]').forEach(n=>{
     const select=()=>{state.selectedNode=n.dataset.node;$$('[data-node]').forEach(x=>x.classList.toggle('selected',x===n));$('#inspector').innerHTML=inspectorHTML();explainTerms($('#inspector'));};
     n.addEventListener('click',select);n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}});
@@ -1167,6 +1246,10 @@ $('#reset-progress').addEventListener('click',()=>{
   overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
   overlay.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='Tab'){const first=$('#cancel-reset'),last=$('#confirm-reset');if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
   $('#cancel-reset').focus();
+});
+compactDiagramMedia.addEventListener('change',()=>{
+  if(state.page!=='journey'||!$('#journey-caption')||!$('#packet-group'))return;
+  stopAnimation();elapsed=0;$('#packet-group')?.closest('svg').replaceWith(document.createRange().createContextualFragment(networkSVG()));bindJourneyNodes();updateJourney();
 });
 addEventListener('hashchange',()=>{render();$('#main').focus({preventScroll:true});});
 addEventListener('pagehide',stopAnimation);

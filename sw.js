@@ -1,7 +1,7 @@
 /* Версия вычисляется по содержимому сборки. Хранится только сам учебник. */
 "use strict";
 const PREFIX='network-school-'+encodeURIComponent(self.registration.scope)+'-';
-const CACHE=PREFIX+'939d656794106c57';
+const CACHE=PREFIX+'f37ada871a615365';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
 const absolute=path=>new URL(path,self.registration.scope).href;
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
